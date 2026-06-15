@@ -404,6 +404,7 @@ pub fn run() {
         .build(tauri::generate_context!())
         .expect("error while running Work Pulse")
         .run(|app_handle, event| {
+            #[cfg(target_os = "macos")]
             if let RunEvent::Reopen { .. } = event {
                 show_main_window(app_handle);
             }
