@@ -4501,7 +4501,7 @@ dependencies = [
 
 [[package]]
 name = "work_pulse"
-version = "0.1.0"
+version = "0.1.2"
 dependencies = [
  "chrono",
  "objc2-app-kit",

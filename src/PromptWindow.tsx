@@ -74,7 +74,7 @@ export default function PromptWindow() {
   if (!ready) {
     return (
       <main className="prompt-shell">
-        <div className="prompt-widget">Loading...</div>
+        <div className="prompt-widget prompt-loading">Loading...</div>
       </main>
     );
   }
@@ -85,7 +85,7 @@ export default function PromptWindow() {
         <div className="prompt-widget-header" data-tauri-drag-region>
           <div className="prompt-widget-title" data-tauri-drag-region>
             <p className="eyebrow">Work Pulse</p>
-            <h2>What are you doing?</h2>
+            <h2>What I&apos;m doing</h2>
           </div>
           <button type="button" className="prompt-close" onClick={() => void dismissPrompt()} aria-label="Close">
             ×
