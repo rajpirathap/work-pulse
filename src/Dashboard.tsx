@@ -25,7 +25,6 @@ import {
   toCsv,
   toDatetimeLocal,
 } from "./time";
-import { usePromptScheduler } from "./usePromptScheduler";
 import { openPromptWindow } from "./windows";
 
 const EMPTY_DRAFT: EntryDraft = {
@@ -57,8 +56,6 @@ export default function Dashboard() {
   const weekEnd = useMemo(() => endOfWeek(selectedDate), [selectedDate]);
   const dayStart = useMemo(() => startOfDay(selectedDate), [selectedDate]);
   const dayEnd = useMemo(() => endOfDay(selectedDate), [selectedDate]);
-
-  usePromptScheduler(settings, ready);
 
   useEffect(() => {
     void bootstrap();

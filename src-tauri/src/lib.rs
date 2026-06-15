@@ -3,13 +3,15 @@ use serde::{Deserialize, Serialize};
 use tauri::{
     menu::{Menu, MenuItem},
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
-    AppHandle, Manager, RunEvent, WindowEvent,
+    AppHandle, Manager, RunEvent, State, WindowEvent,
 };
 
+mod prompt_scheduler;
 mod prompt_window;
 
+use prompt_scheduler::{start_prompt_scheduler, PromptSchedulerState, read_settings};
 use prompt_window::{
-    configure_macos_prompt_window, hide_prompt_window, show_prompt_window,
+    configure_macos_prompt_window, hide_prompt_window, request_show_prompt_window,
 };
 
 #[derive(Debug, Serialize)]
@@ -114,13 +116,35 @@ fn show_dashboard(app: AppHandle) -> Result<(), String> {
 
 #[tauri::command]
 fn show_prompt(app: AppHandle) -> Result<(), String> {
-    show_prompt_window(&app);
+    request_show_prompt_window(&app);
     Ok(())
 }
 
 #[tauri::command]
 fn hide_prompt(app: AppHandle) -> Result<(), String> {
     hide_prompt_window(&app);
+    Ok(())
+}
+
+#[tauri::command]
+fn set_snooze(until: String, state: State<PromptSchedulerState>) -> Result<(), String> {
+    let parsed = chrono::DateTime::parse_from_rfc3339(&until)
+        .map_err(|error| format!("Invalid snooze time: {error}"))?
+        .with_timezone(&chrono::Utc);
+
+    *state
+        .snooze_until
+        .lock()
+        .map_err(|_| "Could not update snooze state".to_string())? = Some(parsed);
+    Ok(())
+}
+
+#[tauri::command]
+fn clear_snooze(state: State<PromptSchedulerState>) -> Result<(), String> {
+    *state
+        .snooze_until
+        .lock()
+        .map_err(|_| "Could not update snooze state".to_string())? = None;
     Ok(())
 }
 
@@ -282,25 +306,7 @@ fn list_projects(app: AppHandle) -> Result<Vec<String>, String> {
 fn get_settings(app: AppHandle) -> Result<Settings, String> {
     let conn = connection(&app)?;
     ensure_schema(&conn)?;
-
-    conn.query_row(
-        "
-        SELECT prompt_interval_minutes, quiet_start, quiet_end, workday_start, workday_end
-        FROM settings
-        WHERE id = 1
-        ",
-        [],
-        |row| {
-            Ok(Settings {
-                prompt_interval_minutes: row.get(0)?,
-                quiet_start: row.get(1)?,
-                quiet_end: row.get(2)?,
-                workday_start: row.get(3)?,
-                workday_end: row.get(4)?,
-            })
-        },
-    )
-    .map_err(|error| format!("Could not read settings: {error}"))
+    read_settings(&conn)
 }
 
 #[tauri::command]
@@ -344,8 +350,11 @@ pub fn run() {
             update_settings,
             show_dashboard,
             show_prompt,
-            hide_prompt
+            hide_prompt,
+            set_snooze,
+            clear_snooze
         ])
+        .manage(PromptSchedulerState::default())
         .setup(|app| {
             let show_dashboard_item =
                 MenuItem::with_id(app, "show-dashboard", "Open Dashboard", true, None::<&str>)?;
@@ -369,7 +378,7 @@ pub fn run() {
                 .show_menu_on_left_click(false)
                 .on_menu_event(|app, event| match event.id.as_ref() {
                     "show-dashboard" => show_main_window(app),
-                    "prompt-now" => show_prompt_window(app),
+                    "prompt-now" => request_show_prompt_window(app),
                     "quit" => app.exit(0),
                     _ => {}
                 })
@@ -392,6 +401,8 @@ pub fn run() {
             if let Some(prompt) = app.get_webview_window("prompt") {
                 configure_macos_prompt_window(&prompt);
             }
+
+            start_prompt_scheduler(app.handle().clone());
 
             Ok(())
         })

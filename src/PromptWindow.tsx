@@ -1,8 +1,7 @@
 import { FormEvent, useEffect, useState } from "react";
 import { emit, listen } from "@tauri-apps/api/event";
-import { createEntry, initDatabase, listProjects } from "./api";
+import { createEntry, initDatabase, listProjects, clearSnooze, setSnoozeUntil } from "./api";
 import type { EntryDraft } from "./types";
-import { clearSnooze, setSnoozeUntil } from "./snooze";
 import { hidePromptWindow } from "./windows";
 
 const EMPTY_DRAFT: EntryDraft = {
@@ -56,7 +55,7 @@ export default function PromptWindow() {
     try {
       setError(null);
       await createEntry(draft);
-      clearSnooze();
+      await clearSnooze();
       setDraft(EMPTY_DRAFT);
       await emit("entry:saved");
       await hidePromptWindow();
@@ -67,7 +66,7 @@ export default function PromptWindow() {
 
   async function snoozePrompt(minutes: number) {
     const until = new Date(Date.now() + minutes * 60_000);
-    setSnoozeUntil(until);
+    await setSnoozeUntil(until.toISOString());
     await emit("prompt:snoozed", { until: until.toISOString() });
     await dismissPrompt();
   }

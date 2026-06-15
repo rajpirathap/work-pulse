@@ -156,6 +156,15 @@ pub fn show_prompt_window(app: &AppHandle) {
     }
 }
 
+pub fn request_show_prompt_window(app: &AppHandle) {
+    let app_handle = app.clone();
+    if let Err(error) = app_handle.clone().run_on_main_thread(move || {
+        show_prompt_window(&app_handle);
+    }) {
+        eprintln!("[work-pulse] failed to schedule prompt window on main thread: {error}");
+    }
+}
+
 pub fn hide_prompt_window(app: &AppHandle) {
     if let Some(window) = app.get_webview_window("prompt") {
         let _ = window.hide();

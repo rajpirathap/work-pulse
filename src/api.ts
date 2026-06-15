@@ -38,3 +38,11 @@ export async function getSettings() {
 export async function updateSettings(settings: Settings) {
   return invoke<Settings>("update_settings", { settings });
 }
+
+export async function setSnoozeUntil(until: string) {
+  return invoke<void>("set_snooze", { until });
+}
+
+export async function clearSnooze() {
+  return invoke<void>("clear_snooze");
+}
