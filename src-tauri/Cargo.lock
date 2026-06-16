@@ -4501,7 +4501,7 @@ dependencies = [
 
 [[package]]
 name = "work_pulse"
-version = "0.1.2"
+version = "0.1.4"
 dependencies = [
  "chrono",
  "objc2-app-kit",
@@ -4512,6 +4512,7 @@ dependencies = [
  "tauri",
  "tauri-build",
  "thiserror 1.0.69",
+ "windows",
 ]
 
 [[package]]

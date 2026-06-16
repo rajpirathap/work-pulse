@@ -23,10 +23,18 @@ impl Default for PromptSchedulerState {
 pub fn start_prompt_scheduler(app: AppHandle) {
     std::thread::spawn(move || {
         loop {
-            std::thread::sleep(next_delay(&app));
+            let delay = next_delay(&app);
+            eprintln!(
+                "[work-pulse] prompt scheduler sleeping for {} seconds",
+                delay.as_secs()
+            );
+            std::thread::sleep(delay);
 
             if should_show_prompt(&app) {
+                eprintln!("[work-pulse] prompt scheduler triggering prompt");
                 request_show_prompt_window(&app);
+            } else {
+                eprintln!("[work-pulse] prompt scheduler skipped (quiet hours or settings error)");
             }
         }
     });

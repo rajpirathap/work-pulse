@@ -1,6 +1,6 @@
 [package]
 name = "work_pulse"
-version = "0.1.3"
+version = "0.1.4"
 description = "A local desktop timesheet prompt app."
 authors = ["Work Pulse"]
 edition = "2021"
@@ -23,3 +23,9 @@ thiserror = "1"
 [target.'cfg(target_os = "macos")'.dependencies]
 objc2-app-kit = "0.3"
 objc2-foundation = "0.3"
+
+[target.'cfg(windows)'.dependencies]
+windows = { version = "0.61", features = [
+    "Win32_Foundation",
+    "Win32_UI_WindowsAndMessaging",
+] }

@@ -1,5 +1,8 @@
 use tauri::{AppHandle, Emitter, Manager, WebviewWindow};
 
+#[cfg(windows)]
+use tauri::UserAttentionType;
+
 const PROMPT_MARGIN: i32 = 16;
 const PROMPT_BOTTOM_MARGIN: i32 = 24;
 const PROMPT_WIDTH: u32 = 360;
@@ -48,9 +51,13 @@ fn position_prompt_bottom_right_macos(window: &WebviewWindow) -> bool {
 fn position_prompt_bottom_right_fallback(window: &WebviewWindow) {
     use tauri::{PhysicalPosition, PhysicalSize};
 
-    let window_size = window
+    let measured = window
         .outer_size()
         .unwrap_or(PhysicalSize::new(PROMPT_WIDTH, PROMPT_HEIGHT));
+    let window_size = PhysicalSize::new(
+        measured.width.max(PROMPT_WIDTH),
+        measured.height.max(PROMPT_HEIGHT),
+    );
 
     let monitor = window
         .current_monitor()
@@ -111,7 +118,13 @@ fn activate_application() {
     }
 }
 
-#[cfg(not(target_os = "macos"))]
+#[cfg(windows)]
+fn activate_application() {
+    // Windows only allows foreground changes in limited cases; showing the prompt
+    // window handles the actual HWND activation in order_prompt_front().
+}
+
+#[cfg(all(not(target_os = "macos"), not(windows)))]
 fn activate_application() {}
 
 #[cfg(target_os = "macos")]
@@ -126,7 +139,56 @@ fn order_prompt_front(window: &WebviewWindow) {
     }
 }
 
-#[cfg(not(target_os = "macos"))]
+#[cfg(windows)]
+fn order_prompt_front(window: &WebviewWindow) {
+    use windows::Win32::UI::WindowsAndMessaging::{
+        AttachThreadInput, FlashWindow, GetForegroundWindow, GetWindowThreadProcessId,
+        SetForegroundWindow, SetWindowPos, ShowWindow, HWND_TOPMOST, SWP_NOMOVE, SWP_NOSIZE,
+        SWP_SHOWWINDOW, SW_SHOW,
+    };
+
+    let Ok(hwnd) = window.hwnd() else {
+        return;
+    };
+
+    unsafe {
+        let _ = ShowWindow(hwnd, SW_SHOW);
+        let _ = SetWindowPos(
+            hwnd,
+            HWND_TOPMOST,
+            0,
+            0,
+            0,
+            0,
+            SWP_NOMOVE | SWP_NOSIZE | SWP_SHOWWINDOW,
+        );
+
+        let foreground = GetForegroundWindow();
+        if foreground.0 != hwnd.0 {
+            let mut foreground_process = Default::default();
+            let mut target_process = Default::default();
+            let foreground_thread =
+                GetWindowThreadProcessId(foreground, Some(&mut foreground_process));
+            let target_thread = GetWindowThreadProcessId(hwnd, Some(&mut target_process));
+
+            if foreground_thread != 0
+                && target_thread != 0
+                && AttachThreadInput(foreground_thread, target_thread, true).is_ok()
+            {
+                let _ = SetForegroundWindow(hwnd);
+                let _ = AttachThreadInput(foreground_thread, target_thread, false);
+            } else {
+                let _ = SetForegroundWindow(hwnd);
+            }
+        }
+
+        let _ = FlashWindow(hwnd, true);
+    }
+
+    let _ = window.request_user_attention(Some(UserAttentionType::Critical));
+}
+
+#[cfg(all(not(target_os = "macos"), not(windows)))]
 fn order_prompt_front(_window: &WebviewWindow) {}
 
 pub fn show_prompt_window(app: &AppHandle) {
@@ -149,7 +211,7 @@ pub fn show_prompt_window(app: &AppHandle) {
     if let Err(error) = window.set_focus() {
         eprintln!("[work-pulse] failed to focus prompt window: {error}");
     }
-    if let Err(error) = app.emit("prompt:open", ()) {
+    if let Err(error) = window.emit("prompt:open", ()) {
         eprintln!("[work-pulse] failed to emit prompt:open: {error}");
     } else {
         eprintln!("[work-pulse] prompt window shown");
