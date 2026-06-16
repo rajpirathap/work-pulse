@@ -141,10 +141,10 @@ fn order_prompt_front(window: &WebviewWindow) {
 
 #[cfg(windows)]
 fn order_prompt_front(window: &WebviewWindow) {
+    use windows::Win32::System::Threading::AttachThreadInput;
     use windows::Win32::UI::WindowsAndMessaging::{
-        AttachThreadInput, FlashWindow, GetForegroundWindow, GetWindowThreadProcessId,
-        SetForegroundWindow, SetWindowPos, ShowWindow, HWND_TOPMOST, SWP_NOMOVE, SWP_NOSIZE,
-        SWP_SHOWWINDOW, SW_SHOW,
+        FlashWindow, GetForegroundWindow, GetWindowThreadProcessId, SetForegroundWindow,
+        SetWindowPos, ShowWindow, HWND_TOPMOST, SWP_NOMOVE, SWP_NOSIZE, SWP_SHOWWINDOW, SW_SHOW,
     };
 
     let Ok(hwnd) = window.hwnd() else {
@@ -155,7 +155,7 @@ fn order_prompt_front(window: &WebviewWindow) {
         let _ = ShowWindow(hwnd, SW_SHOW);
         let _ = SetWindowPos(
             hwnd,
-            HWND_TOPMOST,
+            Some(HWND_TOPMOST),
             0,
             0,
             0,
@@ -173,7 +173,7 @@ fn order_prompt_front(window: &WebviewWindow) {
 
             if foreground_thread != 0
                 && target_thread != 0
-                && AttachThreadInput(foreground_thread, target_thread, true).is_ok()
+                && AttachThreadInput(foreground_thread, target_thread, true).as_bool()
             {
                 let _ = SetForegroundWindow(hwnd);
                 let _ = AttachThreadInput(foreground_thread, target_thread, false);

@@ -3,8 +3,11 @@ use serde::{Deserialize, Serialize};
 use tauri::{
     menu::{Menu, MenuItem},
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
-    AppHandle, Manager, RunEvent, State, WindowEvent,
+    AppHandle, Manager, State, WindowEvent,
 };
+
+#[cfg(target_os = "macos")]
+use tauri::RunEvent;
 
 mod prompt_scheduler;
 mod prompt_window;
@@ -415,6 +418,9 @@ pub fn run() {
         .build(tauri::generate_context!())
         .expect("error while running Work Pulse")
         .run(|app_handle, event| {
+            #[cfg(not(target_os = "macos"))]
+            let _ = (&app_handle, &event);
+
             #[cfg(target_os = "macos")]
             if let RunEvent::Reopen { .. } = event {
                 show_main_window(app_handle);
