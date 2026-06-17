@@ -1,6 +1,6 @@
 [package]
 name = "work_pulse"
-version = "0.1.6"
+version = "0.1.7"
 description = "A local desktop timesheet prompt app."
 authors = ["Work Pulse"]
 edition = "2021"
