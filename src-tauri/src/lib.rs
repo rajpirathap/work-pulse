@@ -159,18 +159,18 @@ fn ensure_schema(conn: &Connection) -> Result<(), String> {
 }
 
 #[cfg(windows)]
-fn configure_windows_main_window(window: &tauri::WebviewWindow) {
+fn configure_windows_main_window(window: &tauri::Window) {
     let _ = window.set_skip_taskbar(true);
 }
 
 #[cfg(not(windows))]
-fn configure_windows_main_window(_window: &tauri::WebviewWindow) {}
+fn configure_windows_main_window(_window: &tauri::Window) {}
 
 fn show_main_window(app: &AppHandle) {
     if let Some(window) = app.get_webview_window("main") {
         let _ = window.show();
         let _ = window.unminimize();
-        configure_windows_main_window(&window);
+        configure_windows_main_window(&window.as_ref().window());
         let _ = window.set_focus();
     }
 }
@@ -434,7 +434,7 @@ pub fn run() {
             create_tray(app.handle())?;
 
             if let Some(main) = app.get_webview_window("main") {
-                configure_windows_main_window(&main);
+                configure_windows_main_window(&main.as_ref().window());
                 #[cfg(target_os = "macos")]
                 {
                     let _ = main.set_skip_taskbar(false);
