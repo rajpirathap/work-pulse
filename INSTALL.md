@@ -31,7 +31,27 @@ If you see **"Work Pulse can't be opened"**:
 2. Scroll down and click **Open Anyway**, or
 3. Right-click the app in Applications → **Open** → **Open** again.
 
+If macOS still blocks the app, run these commands in Terminal:
+
+```sh
+xattr -cr "/Applications/Work Pulse.app"
+codesign --force --deep --sign - "/Applications/Work Pulse.app"
+open "/Applications/Work Pulse.app"
+```
+
+This only approves **Work Pulse** on your Mac. It does **not** disable Gatekeeper for other apps.
+
 After the first successful launch, you can open it normally.
+
+### macOS launch tips
+
+- Always launch `/Applications/Work Pulse.app`, not a build output from the project folder.
+- If you think multiple copies are running, quit them and relaunch cleanly:
+
+```sh
+pkill -x work_pulse
+open "/Applications/Work Pulse.app"
+```
 
 ## Windows installation
 

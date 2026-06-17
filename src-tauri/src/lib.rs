@@ -2,12 +2,9 @@ use rusqlite::{params, Connection};
 use serde::{Deserialize, Serialize};
 use tauri::{
     menu::{Menu, MenuItem},
-    tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
-    AppHandle, Manager, State, WindowEvent,
+    tray::{MouseButton, MouseButtonState, TrayIcon, TrayIconBuilder, TrayIconEvent},
+    AppHandle, Manager, RunEvent, State, WindowEvent,
 };
-
-#[cfg(target_os = "macos")]
-use tauri::RunEvent;
 
 mod prompt_scheduler;
 mod prompt_window;
@@ -16,6 +13,64 @@ use prompt_scheduler::{start_prompt_scheduler, PromptSchedulerState, read_settin
 use prompt_window::{
     configure_macos_prompt_window, hide_prompt_window, request_show_prompt_window,
 };
+
+const TRAY_ICON_ID: &str = "work-pulse-tray";
+
+struct TrayState {
+    _tray: TrayIcon,
+}
+
+fn create_tray(app: &AppHandle) -> Result<(), String> {
+    if app.tray_by_id(TRAY_ICON_ID).is_some() {
+        return Ok(());
+    }
+
+    let show_dashboard_item =
+        MenuItem::with_id(app, "show-dashboard", "Open Dashboard", true, None::<&str>)
+            .map_err(|error| format!("Could not create tray menu item: {error}"))?;
+    let prompt_now_item =
+        MenuItem::with_id(app, "prompt-now", "Prompt Now", true, None::<&str>)
+            .map_err(|error| format!("Could not create tray menu item: {error}"))?;
+    let quit_item = MenuItem::with_id(app, "quit", "Quit Work Pulse", true, None::<&str>)
+        .map_err(|error| format!("Could not create tray menu item: {error}"))?;
+    let tray_menu = Menu::with_items(
+        app,
+        &[&show_dashboard_item, &prompt_now_item, &quit_item],
+    )
+    .map_err(|error| format!("Could not create tray menu: {error}"))?;
+
+    let icon = app
+        .default_window_icon()
+        .ok_or("Work Pulse is missing a tray icon")?
+        .clone();
+
+    let tray = TrayIconBuilder::with_id(TRAY_ICON_ID)
+        .icon(icon)
+        .tooltip("Work Pulse")
+        .menu(&tray_menu)
+        .show_menu_on_left_click(false)
+        .on_menu_event(|app, event| match event.id.as_ref() {
+            "show-dashboard" => show_main_window(app),
+            "prompt-now" => request_show_prompt_window(app),
+            "quit" => app.exit(0),
+            _ => {}
+        })
+        .on_tray_icon_event(|tray, event| {
+            if let TrayIconEvent::Click {
+                button: MouseButton::Left,
+                button_state: MouseButtonState::Up,
+                ..
+            } = event
+            {
+                show_main_window(tray.app_handle());
+            }
+        })
+        .build(app)
+        .map_err(|error| format!("Could not create tray icon: {error}"))?;
+
+    app.manage(TrayState { _tray: tray });
+    Ok(())
+}
 
 #[derive(Debug, Serialize)]
 struct Entry {
@@ -103,10 +158,19 @@ fn ensure_schema(conn: &Connection) -> Result<(), String> {
     .map_err(|error| format!("Could not initialize database schema: {error}"))
 }
 
+#[cfg(windows)]
+fn configure_windows_main_window(window: &tauri::WebviewWindow) {
+    let _ = window.set_skip_taskbar(true);
+}
+
+#[cfg(not(windows))]
+fn configure_windows_main_window(_window: &tauri::WebviewWindow) {}
+
 fn show_main_window(app: &AppHandle) {
     if let Some(window) = app.get_webview_window("main") {
         let _ = window.show();
         let _ = window.unminimize();
+        configure_windows_main_window(&window);
         let _ = window.set_focus();
     }
 }
@@ -341,7 +405,15 @@ fn update_settings(app: AppHandle, settings: Settings) -> Result<Settings, Strin
 }
 
 pub fn run() {
-    tauri::Builder::default()
+    let mut builder = tauri::Builder::default();
+    #[cfg(desktop)]
+    {
+        builder = builder.plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
+            show_main_window(app);
+        }));
+    }
+
+    builder
         .invoke_handler(tauri::generate_handler![
             init_database,
             create_entry,
@@ -359,43 +431,19 @@ pub fn run() {
         ])
         .manage(PromptSchedulerState::default())
         .setup(|app| {
-            let show_dashboard_item =
-                MenuItem::with_id(app, "show-dashboard", "Open Dashboard", true, None::<&str>)?;
-            let prompt_now_item =
-                MenuItem::with_id(app, "prompt-now", "Prompt Now", true, None::<&str>)?;
-            let quit_item = MenuItem::with_id(app, "quit", "Quit Work Pulse", true, None::<&str>)?;
-            let tray_menu = Menu::with_items(
-                app,
-                &[&show_dashboard_item, &prompt_now_item, &quit_item],
-            )?;
+            create_tray(app.handle())?;
 
-            let icon = app
-                .default_window_icon()
-                .ok_or("Work Pulse is missing a tray icon")?
-                .clone();
-
-            TrayIconBuilder::new()
-                .icon(icon)
-                .tooltip("Work Pulse")
-                .menu(&tray_menu)
-                .show_menu_on_left_click(false)
-                .on_menu_event(|app, event| match event.id.as_ref() {
-                    "show-dashboard" => show_main_window(app),
-                    "prompt-now" => request_show_prompt_window(app),
-                    "quit" => app.exit(0),
-                    _ => {}
-                })
-                .on_tray_icon_event(|tray, event| {
-                    if let TrayIconEvent::Click {
-                        button: MouseButton::Left,
-                        button_state: MouseButtonState::Up,
-                        ..
-                    } = event
-                    {
-                        show_main_window(tray.app_handle());
-                    }
-                })
-                .build(app)?;
+            if let Some(main) = app.get_webview_window("main") {
+                configure_windows_main_window(&main);
+                #[cfg(target_os = "macos")]
+                {
+                    let _ = main.set_skip_taskbar(false);
+                }
+                #[cfg(windows)]
+                {
+                    let _ = main.hide();
+                }
+            }
 
             if let Some(conn) = connection(app.handle()).ok() {
                 let _ = ensure_schema(&conn);
@@ -410,16 +458,31 @@ pub fn run() {
             Ok(())
         })
         .on_window_event(|window, event| {
+            if window.label() == "main" {
+                #[cfg(windows)]
+                if matches!(
+                    event,
+                    WindowEvent::Focused(true) | WindowEvent::Resized(_)
+                ) {
+                    configure_windows_main_window(window);
+                }
+            }
+
             if let WindowEvent::CloseRequested { api, .. } = event {
                 api.prevent_close();
                 let _ = window.hide();
+                #[cfg(windows)]
+                if window.label() == "main" {
+                    configure_windows_main_window(window);
+                }
             }
         })
         .build(tauri::generate_context!())
         .expect("error while running Work Pulse")
         .run(|app_handle, event| {
-            #[cfg(not(target_os = "macos"))]
-            let _ = (&app_handle, &event);
+            if let RunEvent::Exit = event {
+                let _ = app_handle.remove_tray_by_id(TRAY_ICON_ID);
+            }
 
             #[cfg(target_os = "macos")]
             if let RunEvent::Reopen { .. } = event {

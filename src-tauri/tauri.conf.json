@@ -18,7 +18,8 @@
         "width": 1180,
         "height": 780,
         "minWidth": 920,
-        "minHeight": 620
+        "minHeight": 620,
+        "skipTaskbar": true
       },
       {
         "label": "prompt",
