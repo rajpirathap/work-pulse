@@ -270,32 +270,34 @@ export default function Dashboard() {
             </button>
           </form>
 
-          {dailyTimeline.length ? (
-            <div className="timeline">
-              {dailyTimeline.map((entry) => (
-                <div className="timeline-row" key={entry.id}>
-                  <div className="time-range">
-                    {formatTime(entry.started_at)} - {formatTime(entry.end_at)}
-                    <span>{formatHours(entry.duration_minutes)}h</span>
+          <div className="card-scroll">
+            {dailyTimeline.length ? (
+              <div className="timeline">
+                {dailyTimeline.map((entry) => (
+                  <div className="timeline-row" key={entry.id}>
+                    <div className="time-range">
+                      {formatTime(entry.started_at)} - {formatTime(entry.end_at)}
+                      <span>{formatHours(entry.duration_minutes)}h</span>
+                    </div>
+                    <div>
+                      <strong>{entry.task_text}</strong>
+                      <p>{entry.project || "Unassigned"}</p>
+                    </div>
+                    <div className="row-actions">
+                      <button type="button" onClick={() => setEditing(entry)}>
+                        Edit
+                      </button>
+                      <button type="button" className="danger" onClick={() => void removeEntry(entry.id)}>
+                        Delete
+                      </button>
+                    </div>
                   </div>
-                  <div>
-                    <strong>{entry.task_text}</strong>
-                    <p>{entry.project || "Unassigned"}</p>
-                  </div>
-                  <div className="row-actions">
-                    <button type="button" onClick={() => setEditing(entry)}>
-                      Edit
-                    </button>
-                    <button type="button" className="danger" onClick={() => void removeEntry(entry.id)}>
-                      Delete
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <p className="empty-state">No entries for this day yet.</p>
-          )}
+                ))}
+              </div>
+            ) : (
+              <p className="empty-state">No entries for this day yet.</p>
+            )}
+          </div>
         </article>
 
         <article className="card">
@@ -304,16 +306,20 @@ export default function Dashboard() {
           <p className="muted">
             Week of {weekStart.toLocaleDateString(undefined, { month: "short", day: "numeric" })}
           </p>
-          <div className="summary-list">
-            {weeklySummary.map((row) => (
-              <div className="summary-row" key={`${row.project}-${row.task}`}>
-                <div>
-                  <strong>{row.project}</strong>
-                  <p>{row.task}</p>
+          <div className="summary-list card-scroll">
+            {weeklySummary.length ? (
+              weeklySummary.map((row) => (
+                <div className="summary-row" key={`${row.project}-${row.task}`}>
+                  <div>
+                    <strong>{row.project}</strong>
+                    <p>{row.task}</p>
+                  </div>
+                  <span>{formatHours(row.minutes)}h</span>
                 </div>
-                <span>{formatHours(row.minutes)}h</span>
-              </div>
-            ))}
+              ))
+            ) : (
+              <p className="empty-state">No weekly totals yet.</p>
+            )}
           </div>
         </article>
 
